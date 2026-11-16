@@ -1,0 +1,4 @@
+build/
+external/JUCE/
+.DS_Store
+*.user
