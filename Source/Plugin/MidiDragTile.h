@@ -22,10 +22,10 @@ public:
 
     void paint (juce::Graphics& g) override
     {
-        const auto accent = juce::Colour (0xff7c5cff);
+        const auto accent = juce::Colour (0xfffa684a);
         auto b = getLocalBounds().toFloat().reduced (1.0f);
 
-        g.setColour (juce::Colour (0xff1b2030));
+        g.setColour (juce::Colour (0xff242427));
         g.fillRoundedRectangle (b, 8.0f);
         g.setColour (accent);
         g.drawRoundedRectangle (b, 8.0f, 1.5f);

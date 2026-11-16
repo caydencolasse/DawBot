@@ -48,7 +48,7 @@ void ClientConnection::messageReceived (const juce::MemoryBlock& block)
     if      (t == type::ask)         handleAsk (msg);
     else if (t == type::showStep)    overlay.showStep ((int) msg["index"]);
     else if (t == type::hideOverlay) overlay.hide();
-    else if (t == type::resetChat)   history.clear();
+    else if (t == type::resetChat)   { ++generation; busy = false; history.clear(); overlay.hide(); }
 }
 
 void ClientConnection::handleAsk (const juce::var& msg)
@@ -81,6 +81,16 @@ void ClientConnection::handleAsk (const juce::var& msg)
     req.context          = msg["context"];
     req.installedPlugins = svc.scanner.getNames();
     req.history          = history;
+    if (auto* memory = msg["history"].getArray())
+    {
+        req.history.clear();
+        for (int i = juce::jmax (0, memory->size() - 12); i < memory->size(); ++i)
+        {
+            const auto role = (*memory)[i]["role"].toString();
+            if (role == "user" || role == "assistant")
+                req.history.add (makeObject ({ { "role", role }, { "text", (*memory)[i]["text"].toString().substring (0, 8000) } }));
+        }
+    }
 
     const auto cfg     = svc.config;   // copy for the worker thread
     const int maxEdge  = cfg.maxImageEdge;
@@ -92,7 +102,8 @@ void ClientConnection::handleAsk (const juce::var& msg)
 
     juce::WeakReference<ClientConnection> weak (this);
 
-    svc.pool.addJob ([weak, id, req, cfg, maxEdge, showOnScreen, logical, physical]() mutable
+    const auto requestGeneration = generation;
+    svc.pool.addJob ([weak, requestGeneration, id, req, cfg, maxEdge, showOnScreen, logical, physical]() mutable
     {
         juce::String captureError;
 
@@ -108,17 +119,18 @@ void ClientConnection::handleAsk (const juce::var& msg)
 
         const auto result = AIClient::ask (cfg, req);
 
-        juce::MessageManager::callAsync ([weak, id, req, result, logical, captureError]
+        juce::MessageManager::callAsync ([weak, requestGeneration, id, req, result, logical, captureError]
         {
             if (auto* self = weak.get())
-                self->finishAsk (id, req, result, logical, captureError);
+                self->finishAsk (requestGeneration, id, req, result, logical, captureError);
         });
     });
 }
 
-void ClientConnection::finishAsk (const juce::String& id, const CoachRequest& req, const CoachResult& result,
+void ClientConnection::finishAsk (juce::uint64 requestGeneration, const juce::String& id, const CoachRequest& req, const CoachResult& result,
                                   juce::Rectangle<int> screenArea, const juce::String& captureError)
 {
+    if (requestGeneration != generation) return;
     busy = false;
     auto& svc = server.services;
 
