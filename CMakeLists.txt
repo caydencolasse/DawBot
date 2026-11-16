@@ -6,6 +6,8 @@ set(CMAKE_OSX_ARCHITECTURES "arm64;x86_64" CACHE STRING "macOS architectures")
 
 project(DawBot VERSION 0.1.0 LANGUAGES C CXX)
 
+option(DAWBOT_COPY_PLUGIN_AFTER_BUILD "Install plugin bundles after building" OFF)
+
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
@@ -42,11 +44,22 @@ juce_add_plugin(DawBot
     EDITOR_WANTS_KEYBOARD_FOCUS TRUE
     VST3_CATEGORIES           Fx Tools
     AU_MAIN_TYPE              kAudioUnitType_Effect
-    COPY_PLUGIN_AFTER_BUILD   TRUE)
+    COPY_PLUGIN_AFTER_BUILD   ${DAWBOT_COPY_PLUGIN_AFTER_BUILD})
+
+juce_add_binary_data(DawBotAssets HEADER_NAME DawBotAssets.h NAMESPACE DawBotAssets SOURCES
+    Resources/logo.png
+    Resources/book.svg Resources/command.svg Resources/folder.svg Resources/help.svg
+    Resources/history.svg Resources/keys.svg Resources/mic.svg Resources/play.svg
+    Resources/settings.svg Resources/wave.svg Resources/info.svg Resources/search.svg
+    Resources/InterRegular.ttf Resources/InterSemiBold.ttf Resources/Inter-OFL.txt)
 
 target_sources(DawBot PRIVATE
     Source/Plugin/PluginProcessor.cpp
     Source/Plugin/PluginEditor.cpp
+    Source/Plugin/WorkspaceState.cpp
+    Source/Plugin/UI/Components.cpp
+    Source/Plugin/UI/Composer.cpp
+    Source/Plugin/UI/WorkspaceViews.cpp
     Source/Shared/MidiClip.cpp)
 
 target_include_directories(DawBot PRIVATE Source)
@@ -57,7 +70,7 @@ target_compile_definitions(DawBot PUBLIC
     JUCE_VST3_CAN_REPLACE_VST2=0)
 
 target_link_libraries(DawBot
-    PRIVATE juce::juce_audio_utils
+    PRIVATE juce::juce_audio_utils DawBotAssets
     PUBLIC  juce::juce_recommended_config_flags
             juce::juce_recommended_lto_flags
             juce::juce_recommended_warning_flags)
@@ -103,3 +116,15 @@ target_link_libraries(DawBotHelper
     PUBLIC  juce::juce_recommended_config_flags
             juce::juce_recommended_lto_flags
             juce::juce_recommended_warning_flags)
+
+option(DAWBOT_BUILD_TESTS "Build native workspace and UI regression tests" OFF)
+if(DAWBOT_BUILD_TESTS)
+    enable_testing()
+    # Permit bounded message-loop pumping only in the optional test build.
+    target_compile_definitions(DawBot PUBLIC JUCE_MODAL_LOOPS_PERMITTED=1)
+    add_executable(DawBotTests Tests/PluginTests.cpp)
+    set_target_properties(DawBotTests PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/DawBotTests_artefacts/$<CONFIG>")
+    target_include_directories(DawBotTests PRIVATE Source)
+    target_link_libraries(DawBotTests PRIVATE DawBot juce::juce_audio_utils)
+    add_test(NAME DawBotTests COMMAND DawBotTests)
+endif()

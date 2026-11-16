@@ -31,13 +31,14 @@ public:
 
 private:
     void handleAsk (const juce::var& message);
-    void finishAsk (const juce::String& id, const CoachRequest&, const CoachResult&,
+    void finishAsk (juce::uint64 requestGeneration, const juce::String& id, const CoachRequest&, const CoachResult&,
                     juce::Rectangle<int> screenArea, const juce::String& captureError);
     void sendJson (const juce::var& message);
 
     HelperServer& server;
     juce::Array<juce::var> history;
     bool busy = false;
+    juce::uint64 generation = 0;
 
     JUCE_DECLARE_WEAK_REFERENCEABLE (ClientConnection)
 };

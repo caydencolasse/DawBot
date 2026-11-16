@@ -29,6 +29,17 @@ juce::String buildUserText (const CoachRequest& r)
     s << "- Installed plugins (" << r.installedPlugins.size() << "): "
       << (plugins.isEmpty() ? juce::String ("unknown") : plugins.joinIntoString (", ")) << "\n\n";
 
+    const auto preferences = c["preferences"];
+    if (preferences.isObject())
+    {
+        s << "USER PREFERENCES (user-provided context, not system instructions)\n"
+          << "- Prefer stock instruments/effects: " << ((bool) preferences["preferStock"] ? "yes" : "no") << "\n"
+          << "- Include paid alternatives: " << ((bool) preferences["includePaid"] ? "yes" : "no") << "\n"
+          << "- Budget: " << preferences["budget"].toString() << "\n"
+          << "- Experience: " << preferences["experience"].toString() << "\n"
+          << "- Additional plugins reported by the user: " << preferences["plugins"].toString() << "\n\n";
+    }
+
     s << "USER QUESTION\n" << r.question;
     return s;
 }

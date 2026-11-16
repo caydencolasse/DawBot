@@ -8,7 +8,7 @@
 // Transport: juce::InterprocessConnection on a localhost-only socket, JSON payloads.
 //
 // plugin -> helper
-//   { type:"ask", id, question, showOnScreen, context:{ host, pluginFormat, os, bpm, timeSignature, isPlaying } }
+//   { type:"ask", id, question, showOnScreen, context:{ host, pluginFormat, os, bpm, timeSignature, isPlaying, preferences }, history:[{role,text}] }
 //   { type:"show_step", index }   { type:"hide_overlay" }   { type:"reset_chat" }
 //
 // helper -> plugin
