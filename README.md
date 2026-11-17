@@ -19,7 +19,7 @@ the plugins you actually own** (Serum, Valhalla, stock devices...).
 │  • transparent click-through overlay: pulsing highlight + step callout    │
 └──────────────┬─────────────────────────────────────────────────────────────┘
                │ HTTPS
-       Anthropic / OpenAI  (dev)   or   api.dawbot.ai proxy (production, see /server)
+       Anthropic (dev) or DawBot proxy → OpenAI Responses (see /server)
 ```
 
 ### Why a plugin + helper app, not just a plugin?
@@ -61,8 +61,7 @@ The helper is at `build/DawBotHelper_artefacts/Release/`. Move it to `/Applicati
 Validate the AU for Logic: `auval -v aufx Dbt1 Dwbt`
 
 ## First run
-1. Open **DawBot Helper**, choose Claude or OpenAI, paste an API key, then click **Save**
-   (or set `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` in the environment).
+1. For **OpenAI**, start the server below, then choose OpenAI in **DawBot Helper**, enter its Base URL and DawBot token, and click **Save**. OpenAI keys are server-only. For Claude development, use the Anthropic key field or `ANTHROPIC_API_KEY`.
 2. macOS: click **Grant Screen Recording**, enable DawBot Helper, and relaunch it.
    *Dev tip:* code-sign your builds with a stable identity. Unsigned rebuilds look like a new app
    to macOS, which then asks for permission again.
@@ -71,13 +70,13 @@ Validate the AU for Logic: `auval -v aufx Dbt1 Dwbt`
    the highlighted steps and drag the MIDI tile onto a MIDI track.
 
 ## How a question flows
-1. The plugin sends `{question, host, bpm, timeSignature}` to the helper.
+1. The plugin sends the question, selected DAW/version, tempo, time signature and preferences to the helper. Set the combined **Default DAW and version** field in Settings (for example, `Ableton Live 12`). If blank, host detection supplies the DAW name but may not supply a version.
 2. The helper captures the display under the mouse (excluding its own overlay), downsizes it to
    1280 px, and JPEG-encodes it.
 3. The model receives the screenshot, the session context, the installed-plugin list and the last few turns.
    Output is forced into a schema: `answer`, `steps[{instruction, target box}]`, `midi`, `plugin_chain`.
    - Claude: a forced tool call (`tool_choice`) with the schema as `input_schema`.
-   - OpenAI: `response_format: json_schema` with `strict: true`.
+   - OpenAI: the Helper calls `/v1/coach` on the DawBot proxy. The server calls the Responses API with `text.format: json_schema`, searches the uploaded manuals first and falls back to web search when needed. Actual citation filenames/URLs and a web-source label are appended to the answer.
 4. Target boxes are mapped from screenshot pixels to screen coordinates. The overlay then highlights
    step 1, and the plugin shows the answer, the step navigator and the MIDI tile.
 
@@ -88,17 +87,37 @@ Validate the AU for Logic: `auval -v aufx Dbt1 Dwbt`
 - The overlay doesn't appear over a DAW in macOS **full-screen mode** (a separate Space). Use a normal window.
 - Pro Tools needs **AAX**: add `AAX` to `FORMATS` after you join the Avid developer program
   and set up PACE signing.
-- API keys are stored in plain text in `config.json` for dev builds. For release, use the proxy
-  (`server/proxy.mjs` → your real backend) so only a DawBot token lives on the user's machine.
+- OpenAI keys are neither loaded nor saved by the Helper. Existing OpenAI keys in an old `config.json` are ignored; clicking Save with OpenAI selected clears that legacy field. Claude development keys and DawBot tokens still use plaintext local configuration.
 - Workspace data is saved per plugin instance in the DAW session. It is not a cross-session account or cloud library. See the native UI section below for limits.
 
-## Production proxy (dev version included)
+## OpenAI Responses proxy (development server)
+
+Node 18+; no npm dependencies. Configure `OPENAI_API_KEY` in the **server environment or secret manager**, using a key from the project that owns vector store `vs_6afb8de47e788191b4de19291ee3d6ea`. Configure `DAWBOT_DEV_TOKENS` with your own nonempty random token (comma-separated for multiple users). Do not commit either secret or put an OpenAI key in the Helper, browser code, or a public environment variable.
+
 ```bash
-ANTHROPIC_API_KEY=sk-ant-... DAWBOT_DEV_TOKENS=devtoken123 node server/proxy.mjs
+# After configuring OPENAI_API_KEY and DAWBOT_DEV_TOKENS securely:
+node server/proxy.mjs
 ```
-Then set `"baseUrl": "http://localhost:8787"` and `"authToken": "devtoken123"` in the helper's
-`config.json` (macOS: `~/Library/Application Support/DawBot/`, Windows: `%APPDATA%\DawBot\`).
-This proxy is where subscriptions, trials and credit packs get enforced.
+
+The dev proxy listens on `127.0.0.1:8787`. In Helper choose **OpenAI**, set **Base URL** to `http://localhost:8787`, and enter the matching **DawBot token**. Remote servers must use HTTPS. Helper config lives at `~/Library/Application Support/DawBot/config.json` on macOS or `%APPDATA%\DawBot\config.json` on Windows. The OpenAI model is server-owned (`OPENAI_MODEL`, default `gpt-5`); the Helper's model/key fields are disabled for OpenAI.
+
+Each question carries the Settings DAW/version string, conversation history, session preferences and optional screenshot. The first Responses call forces `file_search` against the existing store. Instructions prioritize the matching DAW/version manual and require `needs_web` if it cannot answer. A second call forces `web_search` only when the first answer needs it or has no file citations. Each call uses `store: false`. Source labels come from API annotations, not model-invented filenames. Web answers are labelled and have source URLs; an answer without verifiable sources is withheld. Existing steps/MIDI remain supported. No new uploads or vector-store metadata changes are made.
+
+Manual/version matching and answer sufficiency are model judgments, not metadata filters: existing store metadata is unknown. Inspect the cited filename, especially when versions differ. This minimal route does not combine manual and web passages in one answer: a fallback answer is explicitly web-sourced. The local attachment picker remains local-only.
+
+This remains a development proxy. Production deployment needs your existing HTTPS/authentication/rate-limit and billing infrastructure; the new coach endpoint does not implement a credit ledger. The old `/v1/chat/completions` proxy path is replaced by `/v1/coach`. Claude's `/v1/messages` path remains available.
+
+### Integration checks
+
+```bash
+node --test server/*.test.mjs
+# Requires a real OPENAI_API_KEY; makes billable Responses/file/web search calls:
+node server/smoke-test.mjs
+```
+
+The smoke test asks one PDF-manual question and one current-release question. It asserts a PDF citation for the former and a web label/URL for the latter, and prints the answers for inspection. Defaults to Ableton Live 12; set `DAWBOT_TEST_DAW` and `DAWBOT_TEST_MANUAL_QUESTION` if a different manual exists in your store. Automated regression tests use mock OpenAI responses and a real local HTTP endpoint; they do not prove live retrieval quality or account access.
+
+Official API references: [file search](https://developers.openai.com/api/docs/guides/tools-file-search), [web search](https://developers.openai.com/api/docs/guides/tools-web-search).
 
 
 ## Native UI increment

@@ -29,12 +29,16 @@ public:
             const auto prev = now == "openai" ? juce::String ("anthropic") : juce::String ("openai");
             if (model.isEmpty() || model.getText() == HelperConfig::defaultModelFor (prev))
                 model.setText (HelperConfig::defaultModelFor (now));
+            updateProviderFields();
         };
 
         model.setText (services.config.model);
         apiKey.setPasswordCharacter ((juce::juce_wchar) 0x2022);
         apiKey.setText (services.config.apiKey);
-        apiKey.setTextToShowWhenEmpty ("sk-ant-... or sk-...", juce::Colours::grey);
+        apiKey.setTextToShowWhenEmpty ("Anthropic key (Claude only)", juce::Colours::grey);
+        authToken.setPasswordCharacter ((juce::juce_wchar) 0x2022);
+        authToken.setText (services.config.authToken);
+        authToken.setTextToShowWhenEmpty ("DawBot server token, not an OpenAI key", juce::Colours::grey);
         baseUrl.setText (services.config.baseUrl);
         baseUrl.setTextToShowWhenEmpty ("Optional, e.g. https://api.dawbot.ai", juce::Colours::grey);
 
@@ -42,7 +46,8 @@ public:
         {
             services.config.provider = providerId();
             services.config.model    = model.getText().trim();
-            services.config.apiKey   = apiKey.getText().trim();
+            services.config.apiKey   = providerId() == "openai" ? juce::String() : apiKey.getText().trim();
+            services.config.authToken = authToken.getText().trim();
             services.config.baseUrl  = baseUrl.getText().trim();
             services.config.save();
             appendLog ("Settings saved.");
@@ -62,20 +67,22 @@ public:
         logView.setCaretVisible (false);
         logView.setFont (juce::Font (juce::FontOptions (12.0f)));
 
-        for (auto* l : { &providerLabel, &modelLabel, &keyLabel, &urlLabel })
+        for (auto* l : { &providerLabel, &modelLabel, &keyLabel, &tokenLabel, &urlLabel })
             l->setJustificationType (juce::Justification::centredRight);
 
         providerLabel.setText ("AI provider", juce::dontSendNotification);
         modelLabel.setText ("Model", juce::dontSendNotification);
         keyLabel.setText ("API key", juce::dontSendNotification);
         urlLabel.setText ("Base URL", juce::dontSendNotification);
+        tokenLabel.setText ("DawBot token", juce::dontSendNotification);
 
         for (auto* c : std::initializer_list<juce::Component*> { &title, &subtitle, &providerLabel, &provider, &modelLabel, &model,
-                                                                 &keyLabel, &apiKey, &urlLabel, &baseUrl, &saveButton,
+                                                                 &keyLabel, &apiKey, &tokenLabel, &authToken, &urlLabel, &baseUrl, &saveButton,
                                                                  &permission, &grantButton, &connections, &logView })
             addAndMakeVisible (c);
 
-        setSize (540, 600);
+        updateProviderFields();
+        setSize (540, 640);
         startTimer (1000);
         timerCallback();
     }
@@ -109,6 +116,7 @@ public:
         row (providerLabel, provider);
         row (modelLabel, model);
         row (keyLabel, apiKey);
+        row (tokenLabel, authToken);
         row (urlLabel, baseUrl);
 
         saveButton.setBounds (r.removeFromTop (30).removeFromRight (120));
@@ -125,6 +133,14 @@ public:
     }
 
 private:
+    void updateProviderFields()
+    {
+        const bool openai = providerId() == "openai";
+        apiKey.setEnabled (!openai);
+        model.setEnabled (!openai); // OpenAI model selection is server-owned.
+        baseUrl.setTextToShowWhenEmpty (openai ? "Required DawBot server, e.g. http://localhost:8787" : "Optional proxy URL", juce::Colours::grey);
+    }
+
     juce::String providerId() const { return provider.getSelectedId() == 2 ? "openai" : "anthropic"; }
 
     void timerCallback() override
@@ -147,9 +163,9 @@ private:
     HelperServices& services;
     HelperServer&   server;
 
-    juce::Label title, subtitle, providerLabel, modelLabel, keyLabel, urlLabel, permission, connections;
+    juce::Label title, subtitle, providerLabel, modelLabel, keyLabel, tokenLabel, urlLabel, permission, connections;
     juce::ComboBox provider;
-    juce::TextEditor model, apiKey, baseUrl, logView;
+    juce::TextEditor model, apiKey, authToken, baseUrl, logView;
     juce::TextButton saveButton { "Save" }, grantButton { "Grant Screen Recording" };
 };
 
