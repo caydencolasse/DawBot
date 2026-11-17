@@ -1,6 +1,6 @@
-# DawBot.ai — Phase 1 (JUCE)
+# dawbot.ai (JUCE)
 
-An AI production coach that lives in your DAW. Ask a question and DawBot looks at
+An AI production coach that lives in your DAW. Ask a question and dawbot looks at
 your screen, **highlights exactly where to click**, walks you through it step by step,
 generates **MIDI clips you drag straight onto a track**, and builds **plugin chains from
 the plugins you actually own** (Serum, Valhalla, stock devices...).
