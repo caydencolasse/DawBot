@@ -4,7 +4,8 @@
 
 // Helper settings, stored as JSON in the user's app-data folder.
 //
-// Dev mode:        provider + apiKey (your own Anthropic / OpenAI key).
+// Claude dev mode: provider + apiKey (your own Anthropic key).
+// OpenAI: always server-backed; provider keys are never loaded or saved locally.
 // Production mode: baseUrl = https://api.dawbot.ai and authToken = the user's DawBot
 //                  session token. The proxy (see /server) holds the real API keys and
 //                  meters credits, so no provider keys ever ship inside the app.

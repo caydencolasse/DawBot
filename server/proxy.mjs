@@ -3,12 +3,14 @@
 // Why: the Helper app should never ship with your Anthropic/OpenAI keys inside it.
 // In production the Helper points its Base URL at https://api.dawbot.ai and sends the
 // user's DawBot token; this proxy checks the token, forwards the request with YOUR
-// key, and records token usage so you can bill credits.
+// key. Claude usage is logged; production billing/auth are outside this dev proxy.
 //
 // Run:  ANTHROPIC_API_KEY=... OPENAI_API_KEY=... DAWBOT_DEV_TOKENS=devtoken123 node server/proxy.mjs
 // Then in DawBot Helper's config.json set: "baseUrl": "http://localhost:8787", "authToken": "devtoken123"
 
 import http from 'node:http';
+import { pathToFileURL } from 'node:url';
+import { askCoach } from './coach.mjs';
 
 const PORT = Number(process.env.PORT || 8787);
 const MAX_BODY = 8 * 1024 * 1024; // screenshots are ~150-400 KB as JPEG
@@ -19,10 +21,7 @@ const ROUTES = {
     url: 'https://api.anthropic.com/v1/messages',
     headers: () => ({ 'x-api-key': process.env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' }),
   },
-  '/v1/chat/completions': {
-    url: 'https://api.openai.com/v1/chat/completions',
-    headers: () => ({ authorization: `Bearer ${process.env.OPENAI_API_KEY}` }),
-  },
+  '/v1/coach': {},
 };
 
 // token -> { input, output, requests }. Replace with your database + credit ledger.
@@ -33,12 +32,13 @@ function send(res, status, obj) {
   res.end(JSON.stringify(obj));
 }
 
-http.createServer(async (req, res) => {
+export function createProxy({ tokens = TOKENS, coach = askCoach } = {}) {
+return http.createServer(async (req, res) => {
   const route = ROUTES[req.url];
   if (req.method !== 'POST' || !route) return send(res, 404, { error: { message: 'Not found' } });
 
   const token = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
-  if (!TOKENS.has(token)) return send(res, 401, { error: { message: 'Invalid or expired DawBot token' } });
+  if (!tokens.has(token)) return send(res, 401, { error: { message: 'Invalid or expired DawBot token' } });
 
   // TODO(production): look up the user's subscription/credit balance here and reject with 402 when empty.
 
@@ -51,6 +51,12 @@ http.createServer(async (req, res) => {
   }
 
   try {
+    if (req.url === '/v1/coach') {
+      let body;
+      try { body = JSON.parse(Buffer.concat(chunks).toString('utf8')); }
+      catch { return send(res, 400, { error: { message: 'Invalid JSON' } }); }
+      return send(res, 200, await coach(body));
+    }
     const upstream = await fetch(route.url, {
       method: 'POST',
       headers: { 'content-type': 'application/json', ...route.headers() },
@@ -73,6 +79,10 @@ http.createServer(async (req, res) => {
     res.writeHead(upstream.status, { 'content-type': 'application/json' });
     res.end(text);
   } catch (err) {
-    send(res, 502, { error: { message: `Upstream error: ${err}` } });
+    send(res, err.status || 502, { error: { message: req.url === '/v1/coach' ? err.message : 'Upstream request failed' } });
   }
-}).listen(PORT, () => console.log(`DawBot proxy listening on http://localhost:${PORT}`));
+});
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href)
+  createProxy().listen(PORT, '127.0.0.1', () => console.log(`DawBot proxy listening on http://localhost:${PORT}`));

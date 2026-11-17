@@ -2,3 +2,7 @@ build/
 external/JUCE/
 .DS_Store
 *.user
+
+.env
+.env.*
+!.env.example

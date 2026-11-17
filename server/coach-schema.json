@@ -1,0 +1,148 @@
+{
+  "type": "object",
+  "properties": {
+    "answer": {
+      "type": "string",
+      "description": "2-5 friendly sentences answering the question."
+    },
+    "steps": {
+      "type": "array",
+      "description": "Ordered walkthrough, one physical action per step. Empty if not needed.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "instruction": {
+            "type": "string"
+          },
+          "target": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "x": {
+                    "type": "number",
+                    "description": "Left edge, screenshot pixels"
+                  },
+                  "y": {
+                    "type": "number",
+                    "description": "Top edge, screenshot pixels"
+                  },
+                  "width": {
+                    "type": "number"
+                  },
+                  "height": {
+                    "type": "number"
+                  },
+                  "label": {
+                    "type": "string",
+                    "description": "Name of the UI element"
+                  }
+                },
+                "required": [
+                  "x",
+                  "y",
+                  "width",
+                  "height",
+                  "label"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "required": [
+          "instruction",
+          "target"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "midi": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Short clip name, e.g. 'E minor i-VI-III-VII'"
+            },
+            "notes": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "pitch": {
+                    "type": "integer"
+                  },
+                  "start_beats": {
+                    "type": "number"
+                  },
+                  "length_beats": {
+                    "type": "number"
+                  },
+                  "velocity": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "pitch",
+                  "start_beats",
+                  "length_beats",
+                  "velocity"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "name",
+            "notes"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "plugin_chain": {
+      "type": "array",
+      "description": "Plugins to use, in signal-chain order. Empty if not relevant.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "plugin": {
+            "type": "string"
+          },
+          "purpose": {
+            "type": "string"
+          },
+          "settings": {
+            "type": "string",
+            "description": "Starting settings with real parameter names"
+          },
+          "installed": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "plugin",
+          "purpose",
+          "settings",
+          "installed"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "answer",
+    "steps",
+    "midi",
+    "plugin_chain"
+  ],
+  "additionalProperties": false
+}

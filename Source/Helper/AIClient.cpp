@@ -49,8 +49,7 @@ juce::String authHeader (const HelperConfig& cfg)
     if (cfg.authToken.isNotEmpty())
         return "Authorization: Bearer " + cfg.authToken;
 
-    return cfg.provider == "openai" ? "Authorization: Bearer " + cfg.apiKey
-                                    : "x-api-key: " + cfg.apiKey;
+    return "x-api-key: " + cfg.apiKey;
 }
 
 juce::var postJson (const juce::String& url, const juce::var& body, const juce::String& headers, juce::String& error)
@@ -59,7 +58,7 @@ juce::var postJson (const juce::String& url, const juce::var& body, const juce::
 
     auto options = juce::URL::InputStreamOptions (juce::URL::ParameterHandling::inPostData)
                        .withExtraHeaders (headers)
-                       .withConnectionTimeoutMs (90'000)
+                       .withConnectionTimeoutMs (180'000)
                        .withStatusCode (&status);
 
     auto stream = juce::URL (url).withPOSTData (juce::JSON::toString (body, true)).createInputStream (options);
@@ -138,64 +137,42 @@ CoachResult askAnthropic (const HelperConfig& cfg, const CoachRequest& req)
     return result;
 }
 
-// --- OpenAI Chat Completions API -------------------------------------------
+// --- OpenAI Responses via the DawBot server (no provider key in the app) ---
 CoachResult askOpenAI (const HelperConfig& cfg, const CoachRequest& req)
 {
-    juce::Array<juce::var> messages;
-    messages.add (makeObject ({ { "role", "system" }, { "content", dawbot::coach::systemPrompt() } }));
+    const auto base = cfg.effectiveBaseUrl();
+    if (cfg.baseUrl.isEmpty() || cfg.authToken.isEmpty())
+        return { {}, "Configure the DawBot server Base URL and DawBot token in Helper. The OpenAI key belongs on the server." };
+    const juce::URL server (base);
+    const auto domain = server.getDomain().toLowerCase();
+    if (domain == "api.openai.com" || !(base.startsWithIgnoreCase ("https://")
+        || (base.startsWithIgnoreCase ("http://") && (domain == "localhost" || domain == "127.0.0.1"))))
+        return { {}, "Use an HTTPS DawBot server URL (HTTP is allowed only for localhost development)." };
 
-    for (const auto& h : req.history)
-        messages.add (makeObject ({ { "role", h["role"] }, { "content", h["text"] } }));
-
-    juce::Array<juce::var> content;
-    content.add (makeObject ({ { "type", "text" }, { "text", buildUserText (req) } }));
-
-    if (req.jpeg.getSize() > 0)
-        content.add (makeObject ({
-            { "type", "image_url" },
-            { "image_url", makeObject ({ { "url", "data:image/jpeg;base64," + juce::Base64::toBase64 (req.jpeg.getData(), req.jpeg.getSize()) },
-                                         { "detail", "high" } }) } }));
-
-    messages.add (makeObject ({ { "role", "user" }, { "content", content } }));
-
+    const auto selected = req.context["preferences"]["daw"].toString().trim();
     const auto body = makeObject ({
-        { "model", cfg.model },
-        { "messages", messages },
-        { "max_completion_tokens", 4096 },
-        { "response_format", makeObject ({
-              { "type", "json_schema" },
-              { "json_schema", makeObject ({ { "name", "coach_response" },
-                                             { "strict", true },
-                                             { "schema", dawbot::coach::responseSchema() } }) } }) } });
-
-    const auto headers = "Content-Type: application/json\r\n" + authHeader (cfg);
-
+        { "question", req.question },
+        { "daw", selected.isNotEmpty() ? selected : req.context["host"].toString() },
+        { "context", buildUserText (req) },
+        { "history", req.history },
+        { "image", req.jpeg.getSize() > 0
+            ? "data:image/jpeg;base64," + juce::Base64::toBase64 (req.jpeg.getData(), req.jpeg.getSize()) : juce::String() }
+    });
     CoachResult result;
-    const auto response = postJson (cfg.effectiveBaseUrl() + "/v1/chat/completions", body, headers, result.error);
-    if (result.error.isNotEmpty())
-        return result;
-
-    const auto message = response["choices"][0]["message"];
-    const auto refusal = message["refusal"].toString();
-
-    if (refusal.isNotEmpty())
-    {
-        result.error = refusal;
-        return result;
-    }
-
-    result.reply = juce::JSON::parse (message["content"].toString());
-    if (! result.reply.isObject())
-        result.error = "The model didn't return a structured answer.";
-
+    result.reply = postJson (base + "/v1/coach", body,
+                            "Content-Type: application/json\r\nAuthorization: Bearer " + cfg.authToken, result.error);
+    if (result.error.isEmpty() && !result.reply.isObject())
+        result.error = "The server didn't return a coaching answer.";
     return result;
 }
 }
 
 CoachResult AIClient::ask (const HelperConfig& cfg, const CoachRequest& req)
 {
+    if (cfg.provider == "openai") return askOpenAI (cfg, req);
+
     if (cfg.apiKey.isEmpty() && cfg.authToken.isEmpty())
         return { {}, "No API key set. Open DawBot Helper and add your Anthropic or OpenAI key." };
 
-    return cfg.provider == "openai" ? askOpenAI (cfg, req) : askAnthropic (cfg, req);
+    return askAnthropic (cfg, req);
 }

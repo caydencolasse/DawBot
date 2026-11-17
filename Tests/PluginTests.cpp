@@ -166,11 +166,12 @@ void connectionTests (const juce::File& captures)
                                  makeObject ({ { "instruction", "Repeat the slice and leave space between hits." }, { "hasTarget", false } }) };
     juce::Array<juce::var> notes { makeObject ({ { "pitch", 60 }, { "start_beats", 0.0 }, { "length_beats", 0.5 }, { "velocity", 100 } }) };
     auto midi = makeObject ({ { "name", "Stutter rhythm" }, { "notes", notes }, { "bars", 1 } });
-    peer.reply (makeObject ({ { "type", "reply" }, { "id", second["id"] }, { "answer", "Start with a short vocal slice. Use repetition and small variations to build the rhythm." }, { "steps", steps }, { "midi", midi } }));
+    peer.reply (makeObject ({ { "type", "reply" }, { "id", second["id"] }, { "answer", juce::String::fromUTF8 ("Web-sourced answer\nStart with a short vocal slice.\n\nWeb source: Ableton manual — https://www.ableton.com/en/manual/") }, { "steps", steps }, { "midi", midi } }));
     expect (waitFor ([&] { return ! processor.isWaiting(); }), "Matching answer finishes waiting state");
     expect (processor.getNumSteps() == 2 && processor.getMidiClip().has_value(), "Live replies retain screen steps and MIDI output");
     {
         DawBotEditor editor (processor); editor.setVisible (true); pump();
+        expect (named (editor, "Open web source: Ableton manual") != nullptr, "Web citations have clickable source actions");
         screenshot (editor, captures, "chat-answer"); click (editor, "Next step");
         expect (processor.getCurrentStep() == 1, "Native step control advances the existing helper flow");
     }

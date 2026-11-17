@@ -240,6 +240,17 @@ void DawBotEditor::Interface::showChat()
     {
         auto& card = body->add<Stack> (12, 24, true); card.panelColour = entry.role == "you" ? raised : surface;
         card.add<Text> (entry.role == "you" ? "You" : "dawbot", 16, foreground, true); card.add<Text> (entry.text, 16, entry.role == "you" ? foreground : muted);
+        if (entry.role == "dawbot")
+            for (const auto& line : juce::StringArray::fromLines (entry.text))
+            {
+                const auto separator = juce::String::fromUTF8 (" — ");
+                if (!line.startsWith ("Web source: ") || !line.contains (separator)) continue;
+                const auto url = line.fromLastOccurrenceOf (separator, false, false).trim();
+                if (!(url.startsWithIgnoreCase ("https://") || url.startsWithIgnoreCase ("http://"))) continue;
+                const auto title = line.fromFirstOccurrenceOf ("Web source: ", false, false)
+                                       .upToLastOccurrenceOf (separator, false, false);
+                action (card, "Open web source: " + title, [url] { juce::URL (url).launchInDefaultBrowser(); });
+            }
     }
     if (proc.isWaiting()) notice ("Working on your question", proc.getStatusText());
     if (proc.getNumSteps() > 0)

@@ -36,15 +36,15 @@ HelperConfig HelperConfig::load()
     {
         c.provider     = json.getProperty ("provider", c.provider).toString();
         c.model        = json.getProperty ("model", defaultModelFor (c.provider)).toString();
-        c.apiKey       = json.getProperty ("apiKey", "").toString();
+        c.apiKey       = c.provider == "openai" ? juce::String() : json.getProperty ("apiKey", "").toString();
         c.baseUrl      = json.getProperty ("baseUrl", "").toString();
         c.authToken    = json.getProperty ("authToken", "").toString();
         c.maxImageEdge = juce::jlimit (640, 2048, (int) json.getProperty ("maxImageEdge", c.maxImageEdge));
     }
 
     // Environment variables are handy during development.
-    if (c.apiKey.isEmpty())
-        c.apiKey = juce::SystemStats::getEnvironmentVariable (c.provider == "openai" ? "OPENAI_API_KEY" : "ANTHROPIC_API_KEY", {});
+    if (c.provider != "openai" && c.apiKey.isEmpty())
+        c.apiKey = juce::SystemStats::getEnvironmentVariable ("ANTHROPIC_API_KEY", {});
 
     return c;
 }
@@ -59,7 +59,7 @@ void HelperConfig::save() const
     const auto json = makeObject ({
         { "provider",     provider },
         { "model",        model },
-        { "apiKey",       apiKey },
+        { "apiKey",       provider == "openai" ? juce::String() : apiKey },
         { "baseUrl",      baseUrl },
         { "authToken",    authToken },
         { "maxImageEdge", maxImageEdge }
