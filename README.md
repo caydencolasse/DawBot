@@ -39,6 +39,10 @@ Source/Helper/              Main (app + settings window), HelperServer (IPC),
                             AIClient + CoachPrompt (system prompt + JSON schema),
                             ScreenCapture_{mac.mm,win.cpp,stub.cpp}, Overlay, PluginScanner, Config
 server/proxy.mjs            dev API proxy: holds your API keys, checks user tokens, meters usage
+mobile/                     dawbot mobile app (Expo / React Native): lessons, idea capture, projects that sync
+                            to the plugin. See mobile/README.md
+website/                    dawbot.ai waitlist landing page (static + Vercel function that saves signups
+                            to Brevo). See website/DEPLOY.md
 ```
 
 ## Build
