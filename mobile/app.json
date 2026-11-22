@@ -1,0 +1,41 @@
+{
+  "expo": {
+    "name": "dawbot",
+    "slug": "dawbot",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "ai.dawbot.app",
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "dawbot listens when you hum or sing an idea so it can turn it into MIDI."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#161618",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "package": "ai.dawbot.app",
+      "permissions": [
+        "RECORD_AUDIO"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "output": "single",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font"
+    ],
+    "scheme": "dawbot",
+    "backgroundColor": "#161618"
+  }
+}
