@@ -100,11 +100,13 @@ a{color:#C23A1F}a:hover{color:#8F2814}
 .faq-q.open .plus{transform:rotate(45deg)}
 .contents{display:contents}.is-hidden{display:none !important}.hp{position:absolute;left:-9999px;width:1px;height:1px;opacity:0}
 html{scroll-behavior:smooth}
+html,body{overflow-x:hidden}
+@supports (overflow:clip){html,body{overflow-x:clip}}
 
 </style>
 </head>
 <body>
-<div class="page" style="width: 100%; overflow-x: hidden">
+<div class="page" style="width: 100%; overflow-x: clip">
 
 <!-- ============ NAV ============ -->
 <header class="sec nav" style="max-width: 1240px; margin: 0 auto; padding: 20px 32px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap">
@@ -685,26 +687,29 @@ html{scroll-behavior:smooth}
 
   // ---------- Plugin feature tabs ----------
   var tabs = $all('[data-tab]');
-  function selectTab(i, focus) {
+  function selectTab(i, focus, scrollStrip) {
     tabs.forEach(function (t, j) {
       var on = i === j;
       t.classList.toggle('on', on);
       t.setAttribute('aria-selected', on ? 'true' : 'false');
       t.tabIndex = on ? 0 : -1;
-      if (on && focus) t.focus();
+      if (on && focus) t.focus({ preventScroll: true });
     });
     $all('[data-panel]').forEach(function (img) { show(img, +img.getAttribute('data-panel') === i); });
     $all('[data-cur-title]').forEach(function (s) { s.textContent = TABS[i].title; });
     $all('[data-cur-body]').forEach(function (s) { s.textContent = TABS[i].body; });
-    if (tabs[i] && tabs[i].scrollIntoView && tabs[i].parentNode.scrollWidth > tabs[i].parentNode.clientWidth) {
-      tabs[i].scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
+    // Scroll only the tab strip sideways (never the page) and only after a user action.
+    var strip = tabs[i] && tabs[i].parentNode;
+    if (scrollStrip && strip && strip.scrollWidth > strip.clientWidth) {
+      var left = tabs[i].offsetLeft - strip.offsetLeft - (strip.clientWidth - tabs[i].offsetWidth) / 2;
+      strip.scrollTo({ left: Math.max(0, left), behavior: 'smooth' });
     }
   }
   tabs.forEach(function (t, i) {
-    t.addEventListener('click', function () { selectTab(i); });
+    t.addEventListener('click', function () { selectTab(i, false, true); });
     t.addEventListener('keydown', function (e) {
-      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); selectTab((i + 1) % tabs.length, true); }
-      if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); selectTab((i - 1 + tabs.length) % tabs.length, true); }
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); selectTab((i + 1) % tabs.length, true, true); }
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); selectTab((i - 1 + tabs.length) % tabs.length, true, true); }
     });
   });
   selectTab(0);
